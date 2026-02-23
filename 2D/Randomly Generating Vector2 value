@@ -1,0 +1,22 @@
+public Vector2 GeneratingRandomPoints()
+{
+    if (cam != null)
+    {
+        Vector2 spondPointMax = cam.ViewportToWorldPoint(new Vector2(1, 1));
+        Vector2 spondPointMin = cam.ViewportToWorldPoint(new Vector2(0, 0));
+
+        float xPoint = Random.Range(spondPointMin.x+ saveBoundries, spondPointMax.x- saveBoundries);
+        float yPoint = Random.Range(spondPointMin.y+ saveBoundries, spondPointMax.y- saveBoundries);
+
+        Vector2 returnValue = new Vector2(xPoint, yPoint);
+
+
+        return (returnValue);
+    }
+    else
+    {
+        return new Vector2(0,0);
+    }
+    
+
+}
