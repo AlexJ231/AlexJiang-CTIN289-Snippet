@@ -1,0 +1,7 @@
+StartCoroutine(Click());
+
+IEnumerator Click() {
+   audiosource.play();
+   yield return someCondition;
+   audiosource.play();
+}
