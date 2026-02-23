@@ -1,0 +1,8 @@
+void RandomFlip()
+{
+    int dir = Random.value < 0.5f ? -1 : 1;
+
+    Vector3 scale = transform.localScale;
+    scale.x = Mathf.Abs(scale.x) * dir;
+    transform.localScale = scale;
+}
