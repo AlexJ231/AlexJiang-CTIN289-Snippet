@@ -1,0 +1,46 @@
+public void Movement()
+{
+    var keyboard = Keyboard.current;
+    if (keyboard == null)
+    {
+        return;
+    }
+
+
+    bool leftKeyPress = keyboard.aKey.isPressed;
+    bool rightKeyPress = keyboard.dKey.isPressed;
+
+    if (leftKeyPress && rightKeyPress) return;
+
+    
+    if (leftKeyPress)
+    {
+        if (currentSpeed > 0)
+        {
+            currentSpeed = Mathf.MoveTowards(currentSpeed, -maxSpeed, deAccleration * Time.deltaTime);
+        }
+        else
+        {
+            currentSpeed = Mathf.MoveTowards(currentSpeed, -maxSpeed, accleration * Time.deltaTime);
+        }
+        
+    }
+    else if(rightKeyPress)
+    {
+        if (currentSpeed < 0)
+        {
+            currentSpeed = Mathf.MoveTowards(currentSpeed, maxSpeed, deAccleration * Time.deltaTime);
+        }
+        else
+        {
+            currentSpeed = Mathf.MoveTowards(currentSpeed, maxSpeed, accleration * Time.deltaTime);
+        }
+        
+    }
+    else
+    {
+
+    }
+
+    currentSpeed = Mathf.Clamp(currentSpeed, -maxSpeed, maxSpeed);
+
