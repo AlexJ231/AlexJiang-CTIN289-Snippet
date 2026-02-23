@@ -2,5 +2,6 @@
 Snippets Library created by Alex Jiang
 
 # Jump to:
-/2D
-/Miscs
+[Scripts for 2D projects](./2D)
+[Scripts for mulitiple purposes](./Miscs)
+
