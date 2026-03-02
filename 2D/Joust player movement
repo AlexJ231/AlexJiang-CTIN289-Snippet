@@ -1,0 +1,182 @@
+using UnityEngine;
+using UnityEngine.InputSystem;
+using UnityEngine.UIElements;
+
+public class PlayerMovement : MonoBehaviour
+{
+    [Header("Shift configuration")]
+    public int maxShift = 8;
+    public float[] shiftSpeeds = new float[0];
+    public float maxSpeed = 6f;
+
+    [Header("Timing (seconds per single-step change)")]
+    public float holdIncreaseInterval = 0.12f;
+    public float oppositeDecelInterval = 0.04f;
+    public bool oppositePressDoesImmediateDrop = true; // not used now but kept for compatibility
+
+    // runtime
+    Rigidbody2D rb;
+    int currentShift = 0;
+    int movementSign = 0;
+    float increaseTimer = 0f;
+    float decelTimer = 0f;
+
+    // NEW: braking state � once set by a single opposite press it continues until shift 0 or cancelled
+    bool braking = false;
+
+    void Awake()
+    {
+        rb = GetComponent<Rigidbody2D>();
+
+        if (shiftSpeeds == null || shiftSpeeds.Length == 0)
+        {
+            shiftSpeeds = new float[maxShift + 1];
+            for (int i = 0; i <= maxShift; i++)
+            {
+                shiftSpeeds[i] = maxSpeed * ((float)i / (float)maxShift);
+            }
+        }
+        else
+        {
+            if (shiftSpeeds.Length != maxShift + 1)
+            {
+                float[] newArr = new float[maxShift + 1];
+                for (int i = 0; i <= maxShift; i++)
+                {
+                    if (i < shiftSpeeds.Length) newArr[i] = shiftSpeeds[i];
+                    else newArr[i] = maxSpeed * ((float)i / (float)maxShift);
+                }
+                shiftSpeeds = newArr;
+            }
+        }
+    }
+
+    void Update()
+    {
+        movement();
+    }
+
+    void FixedUpdate()
+    {
+        float speed = shiftSpeeds[Mathf.Clamp(currentShift, 0, shiftSpeeds.Length - 1)];
+        Vector2 v = rb.linearVelocity;         // recommended API: rb.velocity (not linearVelocity)
+        v.x = movementSign * speed;
+        rb.linearVelocity = v;
+    }
+
+    public void movement()
+    {
+        var keyboard = Keyboard.current;
+        if (keyboard == null) return;
+
+        bool leftPressed = keyboard.aKey.wasPressedThisFrame || keyboard.leftArrowKey.wasPressedThisFrame;
+        bool rightPressed = keyboard.dKey.wasPressedThisFrame || keyboard.rightArrowKey.wasPressedThisFrame;
+
+        bool leftHeld = keyboard.aKey.isPressed || keyboard.leftArrowKey.isPressed;
+        bool rightHeld = keyboard.dKey.isPressed || keyboard.rightArrowKey.isPressed;
+
+        if ((leftPressed && rightPressed) || (leftHeld && rightHeld))
+        {
+            return;
+        }
+
+        // ------------------- BRAKING / OPPOSITE INPUT HANDLING -------------------
+        if (movementSign != 0)
+        {
+            bool oppositePressed = (movementSign > 0 && leftPressed) || (movementSign < 0 && rightPressed);
+            bool oppositeHeld = (movementSign > 0 && leftHeld) || (movementSign < 0 && rightHeld);
+
+            // If player presses opposite: start braking mode (single press is enough)
+            if (oppositePressed)
+            {
+                braking = true;
+                decelTimer = 0f;          // start from 0 so first decrement happens after full interval
+                increaseTimer = 0f;      // pause increase while braking
+            }
+
+            // If currently braking, perform gradual step-down every interval
+            if (braking)
+            {
+                // If player cancels braking by pressing/holding the original direction, stop braking
+                bool cancelBrakingBySameDirection = (movementSign > 0 && rightPressed) || (movementSign < 0 && leftPressed)
+                                                    || (movementSign > 0 && rightHeld) || (movementSign < 0 && leftHeld);
+                if (cancelBrakingBySameDirection)
+                {
+                    braking = false;
+                    decelTimer = 0f;
+                    // resume normal behavior (do not change currentShift immediately)
+                }
+                else
+                {
+                    // accumulate and step down
+                    decelTimer += Time.deltaTime;
+                    if (decelTimer >= oppositeDecelInterval)
+                    {
+                        decelTimer = 0f;
+                        currentShift = Mathf.Max(0, currentShift - 1);
+                    }
+
+                    // When we've fully decelerated to zero, stop movement (static) and exit braking
+                    if (currentShift == 0)
+                    {
+                        braking = false;
+                        movementSign = 0; // become static when shift reaches zero
+                        increaseTimer = 0f;
+                        decelTimer = 0f;
+                    }
+
+                    // While braking we do not proceed to normal increase logic in this frame
+                    return;
+                }
+            }
+            // If not braking and oppositeHeld (without prior oppositePressed), don't do anything - just normal behavior continues
+        }
+
+        // ------------------- ESTABLISH DIRECTION IF STOPPED -------------------
+        if (movementSign == 0)
+        {
+            if (rightPressed || rightHeld)
+            {
+                movementSign = 1;
+            }
+            else if (leftPressed || leftHeld)
+            {
+                movementSign = -1;
+            }
+        }
+
+        // ------------------- ACCELERATION / SHIFT INCREASE -------------------
+        if (movementSign != 0)
+        {
+            bool holdingSame = (movementSign > 0 && rightHeld) || (movementSign < 0 && leftHeld);
+            bool pressSame = (movementSign > 0 && rightPressed) || (movementSign < 0 && leftPressed);
+
+            if (pressSame)
+            {
+                currentShift = Mathf.Min(maxShift, currentShift + 1);
+                increaseTimer = 0f;
+            }
+            else if (holdingSame)
+            {
+                increaseTimer += Time.deltaTime;
+                if (increaseTimer >= holdIncreaseInterval)
+                {
+                    increaseTimer = 0f;
+                    currentShift = Mathf.Min(maxShift, currentShift + 1);
+                }
+            }
+        }
+
+        currentShift = Mathf.Clamp(currentShift, 0, maxShift);
+    }
+
+    public void ForceStop()
+    {
+        currentShift = 0;
+        movementSign = 0;
+        rb.linearVelocity = new Vector2(0f, rb.linearVelocity.y);
+    }
+
+    public int CurrentShift => currentShift;
+    public float CurrentSpeed => shiftSpeeds[Mathf.Clamp(currentShift, 0, shiftSpeeds.Length - 1)] * movementSign;
+}
